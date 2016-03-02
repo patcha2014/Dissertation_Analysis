@@ -15,26 +15,23 @@ library(Hmisc)
 # i5 = previous province 
 # i6 = main reason for moving (01=job search,02=job change,05=school)
 
-#y07s1 <- csv.get(file="w1s1.csv",head=TRUE,sep=",",lowernames=TRUE,charfactor=FALSE)
-y07s2a <- csv.get(file="w1s2_a.csv",head=TRUE,sep=",",lowernames=TRUE,charfactor=FALSE)
-#y07s2b <- csv.get(file="w1s2_b.csv",head=TRUE,sep=",",lowernames=TRUE,charfactor=FALSE)
-#colnames(y07s1); colnames(y07s2b)
+# 2005 -----------------------------
+# Variables we need is in s2a file
+
+y05s2a <- csv.get(file="w1s2_a.csv",head=TRUE,sep=",",lowernames=TRUE,charfactor=FALSE)
 colnames(y07s2a)
-y07 <- y07s2a[c(3,84:86)]
-colnames(y07) <- c("hid","occu1_0")
-# Want to cbind by c("w","serial.no","h","check.no","hid","reg","area","psu.no","hh.no","members15")
+ses <- y05s2a[c(3,9,84:86)] # select only hh_id (hid), member no (pno). and recent occupation list (f4.1-3)
+colnames(ses) <- c("h_id","m_id","occu1_05","occu2_05","occu3_05")
+rm(y05s2a)
 
-# f4 = occupation (in 3 recent periods)
-table(y07s2a$f4.1); table(y07s2a$f4.2); table(y07s2a$f4.3)
+# 2006 -----------------------------
 
+y06s2 <- csv.get(file="w2s2.csv",head=TRUE,sep=",",lowernames=TRUE,charfactor=FALSE)
+colnames(y06s2)
+y06s2 <- y06s2[c(5,12,73:75)]
+colnames(y06s2) <- c("h_id","m_id","occu1_06","occu2_06","occu3_06")
+ses <- cbind(ses,y06s2)
 
-
-
-y08s1 <- csv.get(file="w2s1.csv",head=TRUE,sep=",",lowernames=TRUE,charfactor=FALSE)
-y08s2 <- csv.get(file="w2s2.csv",head=TRUE,sep=",",lowernames=TRUE,charfactor=FALSE)
-colnames(y08s1); colnames(y08s2)
-library(plyr)
-y08 <- rbind.fill(y08s1,y08s2)
 
 ses05 <- y07s1[,(1:10,)]
 nametemp <- colnames(ses05)
