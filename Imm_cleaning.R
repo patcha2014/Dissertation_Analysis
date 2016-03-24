@@ -1,0 +1,85 @@
+# Importing and cleaning immigrant work permit data
+
+rm(list=ls()) # clear workspace
+
+library("foreign")
+library("AER")
+library("Hmisc") # get spss (.sav), csv files
+library("xlsx")
+#library("plyr")
+
+month <- paste("Sheet",seq(1,12,1),sep="") # Create list of sheet names within each excel file we need to import. Sheet1 is January and so on
+year <- c("2007","2008","2009","2010","2011","2012","2013","2014","2015")
+filename <- paste(paste("imm",year_list,sep=""),"xlsx",sep=".") # List of file names. 
+
+#----------------------
+# Importing excel files
+#----------------------
+setwd("/Users/Mint/Dropbox/Dissertation_Data/Imm_dat")
+
+imm2007 <- list()
+for (i in 1:12) {
+  imm2007[[i]] <- read.xlsx("imm2007.xlsx", sheetName=month[i])
+}
+
+imm2008 <- list()
+for (i in 1:12) {
+  imm2008[[i]] <- read.xlsx("imm2008.xlsx", sheetName=month[i])
+}
+
+imm2009 <- list()
+for (i in 1:12) {
+  imm2009[[i]] <- read.xlsx("imm2009.xlsx", sheetName=month[i])
+}
+
+imm2010 <- list()
+for (i in 1:12) {
+  imm2010[[i]] <- read.xlsx("imm2010.xlsx", sheetName=month[i])
+}
+
+imm2011 <- list()
+for (i in 1:12) {
+  imm2011[[i]] <- read.xlsx("imm2011.xlsx", sheetName=month[i])
+}
+
+imm2012 <- list()
+for (i in 1:12) {
+  imm2012[[i]] <- read.xlsx("imm2012.xlsx", sheetName=month[i])
+}
+
+imm2013 <- list()
+for (i in 1:12) {
+  imm2013[[i]] <- read.xlsx("imm2013.xlsx", sheetName=month[i])
+}
+
+imm2014 <- list()
+for (i in 1:12) {
+  imm2014[[i]] <- read.xlsx("imm2014.xlsx", sheetName=month[i])
+}
+
+imm2015 <- list()
+for (i in 1:12) {
+  imm2015[[i]] <- read.xlsx("imm2015.xlsx", sheetName=month[i])
+}
+
+#imm2007[imm2007=="-"] <- NA
+
+# Combine all years into one list
+imm.dat <- list(imm2007,imm2008,imm2009,imm2010,imm2011,imm2012,imm2013,imm2014,imm2015) 
+
+completeFun <- function(data, desiredCols) {
+  completeVec <- complete.cases(data[, desiredCols])
+  return(data[completeVec, ])
+}
+
+for (i in 1:length(year)) {
+  for (j in 1:length(month)) {
+    imm.dat[[i]][[j]] <- completeFun(imm.dat[[i]][[j]], "cwt") # Keep only province level rows 
+    imm.dat[[i]][[j]] <- imm.dat[[i]][[j]][-1,] # Remove duplicated rows
+  }
+}
+
+
+imm.dat[[1]][[1]] <- unique(imm.dat[[1]][[1]], by="cwt")
+imm.dat[[1]][[1]] <- imm.dat[[1]][[1]][!duplicated(imm.dat[[1]][[1]],by="cwt")]
+
