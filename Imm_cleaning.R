@@ -243,25 +243,11 @@ imm.mo.df <- csv.get("imm.txt",sep="\t") # import back in
 quarter <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
 imm.mo.df$qtr <- sapply(imm.mo.df$mo,quarter) # assign quarters
 
-install.packages("reshape2")
-library("reshape2")
-test <- imm.mo.df[1:1000,]
-test <- test[,c("qtr","yr","limm")]
-
-
-library("plyr")
-ddply(test, c("qtr"), summarize, outVal = mean(data))
 aggregate(test$limm, list(Q = test$qtr, Y = test$yr),mean,na.rm=TRUE)
-cwt <- unique(imm.mo.df$cwt)
-qtr <- seq(1:4)
-imm.qtr.df <- expand.grid(year,qtr <- seq(1:4),cwt)
-colnames(imm.qtr.df) <- c("yr","qtr","cwt")
-imm.qtr.df$limm.beg <- NA
 
+#average
+imm.qtr.df <- aggregate(imm.mo.df$limm, list(yr = imm.mo.df$yr, qtr = imm.mo.df$qtr,reg = imm.mo.df$reg, cwt = imm.mo.df$cwt),mean,na.rm=TRUE); names(imm.qtr.df)[5] <- "limm.avg"
 
-x = data.frame(subject = c("John", "Mary"), 
-               time = c(1,1),
-               age = c(33,NA),
-               weight = c(90, NA),
-               height = c(2,2))
+#-------export file------------
+write.table(imm.qtr.df,"imm.qtr.txt",sep="\t")
 
