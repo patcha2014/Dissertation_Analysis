@@ -234,18 +234,34 @@ completeFun <- function(data, desiredCols) {
 imm.dat <- completeFun(imm.dat, "cwt") # remove rows without province ID
 imm.dat <- completeFun(imm.dat, "reg") # Bkk data appeared twice in each year--one row has reg ID and the other doesn't. Remove row without reg ID. 
 
-
-
-#-------convert data to quarterly--------
-
-cwt <- unique(imm.dat$cwt)
-qtr <- seq(1:4)
-qtr.imm.dat <- expand.grid(year,qtr <- seq(1:4),cwt)
-colnames(qtr.imm.dat) <- c("yr","qtr","cwt")
-
-
-
-
 #-------export file------------
 write.table(imm.dat,"imm.txt",sep="\t")
+
+imm.mo.df <- csv.get("imm.txt",sep="\t") # import back in
+
+#-------convert data to quarterly--------
+quarter <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
+imm.mo.df$qtr <- sapply(imm.mo.df$mo,quarter) # assign quarters
+
+install.packages("reshape2")
+library("reshape2")
+test <- imm.mo.df[1:1000,]
+test <- test[,c("qtr","yr","limm")]
+
+
+library("plyr")
+ddply(test, c("qtr"), summarize, outVal = mean(data))
+aggregate(test$limm, list(Q = test$qtr, Y = test$yr),mean,na.rm=TRUE)
+cwt <- unique(imm.mo.df$cwt)
+qtr <- seq(1:4)
+imm.qtr.df <- expand.grid(year,qtr <- seq(1:4),cwt)
+colnames(imm.qtr.df) <- c("yr","qtr","cwt")
+imm.qtr.df$limm.beg <- NA
+
+
+x = data.frame(subject = c("John", "Mary"), 
+               time = c(1,1),
+               age = c(33,NA),
+               weight = c(90, NA),
+               height = c(2,2))
 
