@@ -192,6 +192,7 @@ wage.df$qtr <- sapply(wage.df$month,quarter) # assign quarters
 wage.wavg.df <- ddply(wage.df, .(reg,cwt,qtr,yr.new),   # so by (province x quarter x year) invoke following function
                       function(x) data.frame(wavg.wage=weighted.mean(x$amount, x$weight)))
 
+names(wage.wavg.df)[4] = "yr"
 write.table(wage.wavg.df,"avgwage.txt",sep="\t")
 
 rm(list=setdiff(ls(), "lfs")) # remove everthing except lfs
