@@ -243,11 +243,19 @@ imm.mo.df <- csv.get("imm.txt",sep="\t") # import back in
 quarter <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
 imm.mo.df$qtr <- sapply(imm.mo.df$mo,quarter) # assign quarters
 
-aggregate(test$limm, list(Q = test$qtr, Y = test$yr),mean,na.rm=TRUE)
-
 #average
-imm.qtr.df <- aggregate(imm.mo.df$limm, list(yr = imm.mo.df$yr, qtr = imm.mo.df$qtr,reg = imm.mo.df$reg, cwt = imm.mo.df$cwt),mean,na.rm=TRUE); names(imm.qtr.df)[5] <- "limm.avg"
+limm.average.df <- aggregate(imm.mo.df$limm, list(yr = imm.mo.df$yr, qtr = imm.mo.df$qtr,reg = imm.mo.df$reg, cwt = imm.mo.df$cwt),mean,na.rm=TRUE)
 
+#max
+limm.max.df <- aggregate(imm.mo.df$limm, list(yr = imm.mo.df$yr, qtr = imm.mo.df$qtr,reg = imm.mo.df$reg, cwt = imm.mo.df$cwt),max,na.rm=TRUE)
+positive <- function(x) if(x > 0) x else NA 
+limm.max.df$max <- sapply(limm.max.df$x,positive)
+
+limm.moments <- cbind(limm.average.df,limm.max.df[,"max"])
+colnames(limm.moments) <- c("yr","qtr","reg","cwt","limm.avg","limm.max")
 #-------export file------------
-write.table(imm.qtr.df,"imm.qtr.txt",sep="\t")
+write.table(limm.moments,"limm_moments.txt",sep="\t")
+
+limm.moments <- csv.get("limm_moments.txt",sep="\t") # import back in
+
 

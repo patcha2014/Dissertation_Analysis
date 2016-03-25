@@ -1,4 +1,4 @@
-1# Less-skilled immigration and natives' outcomes
+# Less-skilled immigration and natives' outcomes
 # Spring 2016
 # Patcha Chaikitmongkol
 
@@ -6,8 +6,8 @@ rm(list=ls()) # clear workspace
 
 library("foreign")
 library("AER")
-library(Hmisc) # get spss (.sav), csv files
-#library("plyr")
+library("Hmisc") # get spss (.sav), csv files
+library("plyr")
 
 # Data directory 
 
@@ -162,8 +162,49 @@ rm(lfs)
 #----------------------------
 # Pull data
 #----------------------------
-
+setwd("/Users/Mint/Dropbox/Dissertation_Data/LFS")
 lfs <- csv.get("lfs.txt",sep="\t")
 
+#count(lfs$occup[lfs$yr==54] != 0)
+
+wage.df <- lfs
+wage.df$yr.new <- wage.df$yr + 1957 # change years e.g. from 58 to 2015
+wage.df <- subset(wage.df, select = c(yr.new,month,reg,cwt,wage.type,amount,weight))
+
+
+# erase obs witout wage amount
+completeFun <- function(data, desiredCols) {
+  completeVec <- complete.cases(data[, desiredCols])
+  return(data[completeVec, ])
+}
+wage.df <- completeFun(wage.df, "amount") 
+wage.df <- completeFun(wage.df, "wage.type")
+#table(wage.df$wage.type)
+wage.df <- wage.df[wage.df[,"wage.type"] == 2,] # keep only wage.type = daily wage (has by far largest obs.)
+#colnames(wage.df)
+
+
+# Create quarter identifier
+quarter <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
+wage.df$qtr <- sapply(wage.df$month,quarter) # assign quarters
+
+# Find weighted average wage in each cell (province x quarter x year)
+wage.wavg.df <- ddply(wage.df, .(cwt,qtr,yr.new),   # so by cwt invoke following function
+       function(x) data.frame(wavg.wage=weighted.mean(wage.df$amount, wage.df$weight)))
+
+
+test <- wage.df[1:1000,]
+test2 <- ddply(test, .(qtr),   # so by cwt invoke following function
+                      function(x) data.frame(x=weighted.mean(test$amount, test$weight)))
+weighted.mean(test$amount, test$weight)
+
+dat <- data.frame(assetclass=sample(LETTERS[1:5], 20, replace=TRUE), 
+                                     return=rnorm(20), assets=1e7+1e7*runif(20))
+ddply(dat, .(assetclass),
+      function(x) data.frame(wret=weighted.mean(x$return, x$assets)))
+
+w.avg.df <- aggregate(wage.df$amount, list(yr = wage.df$yr.new, qtr = wage.df$qtr,reg = wage.df$reg, cwt = wage.df$cwt),mean,na.rm=TRUE); colnames(w.avg.df) <- c("yr","qtr","reg","cwt","wage.avg") # compute average daily wage in each province in each quarter
+
+rm(list=setdiff(ls(), "lfs")) # remove everthing except lfs
 
 
