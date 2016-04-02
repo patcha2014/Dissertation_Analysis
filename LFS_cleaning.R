@@ -157,44 +157,94 @@ lfs <- rbind(q1,q2,q3,lfs)
 rm(q1,q2,q3,colnum) 
 
 write.table(lfs, "lfs.txt",sep="\t")
-rm(lfs)
 
 #----------------------------
-# Pull data
+# Compute wage
 #----------------------------
-setwd("/Users/Mint/Dropbox/Dissertation_Data/LFS")
-lfs <- csv.get("lfs.txt",sep="\t")
-
-#count(lfs$occup[lfs$yr==54] != 0)
-
-wage.df <- lfs
-wage.df$yr.new <- wage.df$yr + 1957 # change years e.g. from 58 to 2015
-wage.df <- subset(wage.df, select = c(yr.new,month,reg,cwt,wage.type,amount,weight))
-
-
-# erase obs witout wage amount
+# function for removing rows with NAs
 completeFun <- function(data, desiredCols) {
   completeVec <- complete.cases(data[, desiredCols])
   return(data[completeVec, ])
 }
+
+setwd("/Users/Mint/Dropbox/Dissertation_Data/LFS")
+lfs <- csv.get("lfs.txt",sep="\t")
+lfs$year <- lfs$yr + 1957 # change year format e.g. from 58 to 2015
+#count(lfs$occup[lfs$yr==54] != 0)
+
+wage.df <- lfs
+
+# edu level identifier
+wage.df <- completeFun(wage.df, "grade.b") # remove rows with no info on edu
+low.edu <- function(x) if(x < 400) 1 else 0 # lower upper secondary
+med.edu <- function(x) if(x > 400 & x < 600) 1 else 0 # upper secondary 
+high.edu <- function(x) if(x >= 600) 1 else 0 
+wage.df$low.edu <- sapply(wage.df$grade.b,low.edu)
+wage.df$med.edu <- sapply(wage.df$grade.b,med.edu)
+wage.df$high.edu <- sapply(wage.df$grade.b,high.edu)
+
+occup.df <- completeFun(wage.df, "occup") # remove rows with no info on occupation
+table(occup.df$occup)
+
+
+# erase obs witout wage amount
 wage.df <- completeFun(wage.df, "amount") 
 wage.df <- completeFun(wage.df, "wage.type")
 #table(wage.df$wage.type)
 wage.df <- wage.df[wage.df[,"wage.type"] == 2,] # keep only wage.type = daily wage (has by far largest obs.)
 #colnames(wage.df)
 
-
 # Create quarter identifier
 quarter <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
 wage.df$qtr <- sapply(wage.df$month,quarter) # assign quarters
 
 # Find weighted average wage in each cell 
-wage.wavg.df <- ddply(wage.df, .(reg,cwt,qtr,yr.new),   # so by (province x quarter x year) invoke following function
-                      function(x) data.frame(wavg.wage=weighted.mean(x$amount, x$weight)))
 
-names(wage.wavg.df)[4] = "yr"
-write.table(wage.wavg.df,"avgwage.txt",sep="\t")
+avgwage.df <- ddply(subset(wage.df), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                           function(x) data.frame(wage=weighted.mean(x$amount, x$weight)))
+
+avgwage.lowedu.df <- ddply(subset(wage.df, low.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                      function(x) data.frame(wage_lowedu=weighted.mean(x$amount, x$weight)))
+
+avgwage.mededu.df <- ddply(subset(wage.df, med.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                           function(x) data.frame(wage_mededu=weighted.mean(x$amount, x$weight)))
+
+#avgwage.highedu.df <- ddply(subset(wage.df, (med.edu==0 & low.edu==0)), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                           #function(x) data.frame(wage_highedu=weighted.mean(x$amount, x$weight)))
+
+avgwage.highedu.df <- ddply(subset(wage.df, (high.edu==1)), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                            function(x) data.frame(wage_highedu=weighted.mean(x$amount, x$weight)))
+
+
+# weighted monthly income in each cell
+
+y.df <- ddply(subset(wage.df), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                     function(x) data.frame(y=weighted.mean(x$approx, x$weight)))
+
+y.lowedu.df <- ddply(subset(wage.df, low.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                           function(x) data.frame(y_lowedu=weighted.mean(x$approx, x$weight)))
+
+y.mededu.df <- ddply(subset(wage.df, med.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                           function(x) data.frame(y_mededu=weighted.mean(x$approx, x$weight)))
+
+y.highedu.df <- ddply(subset(wage.df, (high.edu==1)), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+                            function(x) data.frame(y_highedu=weighted.mean(x$approx, x$weight)))
+
+
+wage.df <- merge(avgwage.lowedu.df,avgwage.mededu.df,by = c("year","qtr","reg","cwt"))
+wage.df <- merge(wage.df,avgwage.highedu.df,by = c("year","qtr","reg","cwt"))
+wage.df <- merge(wage.df,avgwage.df,by = c("year","qtr","reg","cwt"))
+wage.df <- merge(wage.df,y.lowedu.df,by = c("year","qtr","reg","cwt"))
+wage.df <- merge(wage.df,y.mededu.df,by = c("year","qtr","reg","cwt"))
+wage.df <- merge(wage.df,y.highedu.df,by = c("year","qtr","reg","cwt"))
+wage.df <- merge(wage.df,y.df,by = c("year","qtr","reg","cwt"))
+
+write.table(wage.df,"wage.txt",sep="\t")
 
 rm(list=setdiff(ls(), "lfs")) # remove everthing except lfs
+
+#----------------------------
+# Compute income 
+#----------------------------
 
 
