@@ -156,21 +156,91 @@ q1 <- q1[-41]; q2 <- q2[-41]; q3 <- q3[-41]
 lfs <- rbind(q1,q2,q3,lfs)
 rm(q1,q2,q3,colnum) 
 
-write.table(lfs, "lfs.txt",sep="\t")
+
+lfs$year <- lfs$yr + 1957 # change year format e.g. from 58 to 2015
+#count(lfs$occup[lfs$yr==54] != 0)
+
+
+write.table(lfs, "lfs.txt",sep="\t") #save cleaned LFS file
+
+
 
 #----------------------------
-# Compute wage
+# Skill 
 #----------------------------
+
+lfs <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/lfs.txt",sep="\t") #Import cleaned LFS file
+
+data  <- lfs 
+colnames(data)
+summary(data$grade.b) #education levels
+
 # function for removing rows with NAs
 completeFun <- function(data, desiredCols) {
   completeVec <- complete.cases(data[, desiredCols])
   return(data[completeVec, ])
 }
 
-setwd("/Users/Mint/Dropbox/Dissertation_Data/LFS")
-lfs <- csv.get("lfs.txt",sep="\t")
-lfs$year <- lfs$yr + 1957 # change year format e.g. from 58 to 2015
-#count(lfs$occup[lfs$yr==54] != 0)
+#-----------Education-----------
+
+data <- completeFun(data, "grade.b") # remove rows with no info on edu
+summary(data$grade.b) #education levels
+data <- data[data$grade.b<900,] # remove rows with other/unknown levels of edu
+summary(data$grade.b) #education levels
+
+
+vocational <- function(x) if(x==420 | x==460 | x==520) 1 else 0 # Vocational education
+data$vocat <- sapply(data$grade.b,vocational)
+
+lesshigh <- function(x) if(x < 400) 1 else 0 # less than high school
+high <- function(x) if(x > 400 & x < 500) 1 else 0 # high school
+postsec <- function(x) if(x > 500 & x < 600) 1 else 0 # post-secondary education 
+college <- function(x) if(x > 600 & x < 700) 1 else 0 # bachelor degree
+grad <- function(x) if(x > 700) 1 else 0 # Master's and Ph.D.  
+data$lesshigh <- sapply(data$grade.b,lesshigh)
+data$high <- sapply(data$grade.b,high)
+data$postsec <- sapply(data$grade.b,postsec)
+data$college <- sapply(data$grade.b,college)
+data$grad <- sapply(data$grade.b,grad)
+
+#-----------Experience------------
+
+data <- completeFun(data, "age") # remove rows with no info on edu
+data <- data[data$age >= 16 & data$age <= 65, ] # keep only obs age btw 16-65
+summary(data$age)
+
+# generate age at which indiv enters labor market 
+data$ent.age[data$lesshigh==1] <- 15 # invdiv with less than highschool enters at 15
+data$ent.age[data$high==1] <- 18 # indiv with high school edu enters at 18
+data$ent.age[data$postsec==1] <- 20  # indiv with post-secondary edu enters at 20
+data$ent.age[data$college==1] <- 22 # indiv with college edu enters at 22
+# assume indiv with grad degree got affected the same way regardless of exp level
+summary(data[,41:48])
+
+data$exp <- data$age - data$ent.age 
+# 3757 obs have -1 yr of experience and less than 500 have less than -1. Change all to 0. 
+data$exp[data$exp < 0] <- 0 
+table(data$exp);summary(data$exp)
+
+#-----Experience cells--------
+exp5 <- function(x) if(x <= 5) 1 else 0 # less than 5 years of experience
+exp20 <- function(x) if(x>5 & x<=20) 1 else 0 # 5-20 years of experience
+exp45 <- function(x) if(x>20 & x<=45) 1 else 0 # 20-45
+exp50 <- function(x) if(x>45 & x<=50) 1 else 0 # 45-50 (Want to see if old workers are more vulnerable)
+data$exp5 <- sapply(data$exp,exp5,na.rm = FALSE)
+data$exp20 <- sapply(data$exp,exp20)
+data$exp45 <- sapply(data$exp,exp45)
+data$exp50 <- sapply(data$exp,exp50)
+summary(data[,41:49])
+#-----edu-exp cells-----------
+test <- data[1:2000,]
+test$exp5 <- sapply(data$exp,exp5,na.rm = FALSE)
+
+#----------------------------
+# Wage
+#----------------------------
+
+
 
 wage.df <- lfs
 
