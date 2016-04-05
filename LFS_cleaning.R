@@ -189,7 +189,7 @@ data <- data[data$grade.b<900,] # remove rows with other/unknown levels of edu
 summary(data$grade.b) #education levels
 
 
-vocational <- function(x) if(x==420 | x==460 | x==520) 1 else 0 # Vocational education
+vocational <- function(x) if(x==420 | x==460 | x==520) 1 else 0 # Vocational education (*don't include college level since general and vocational use the same code)
 data$vocat <- sapply(data$grade.b,vocational)
 
 lesshigh <- function(x) if(x < 400) 1 else 0 # less than high school
@@ -220,101 +220,114 @@ summary(data[,41:48])
 data$exp <- data$age - data$ent.age 
 # 3757 obs have -1 yr of experience and less than 500 have less than -1. Change all to 0. 
 data$exp[data$exp < 0] <- 0 
+data$exp[is.na(data$exp)] <- 99 # change NA rows (obs with grad degree) to 99
 table(data$exp);summary(data$exp)
 
 #-----Experience cells--------
+
 exp5 <- function(x) if(x <= 5) 1 else 0 # less than 5 years of experience
 exp20 <- function(x) if(x>5 & x<=20) 1 else 0 # 5-20 years of experience
 exp45 <- function(x) if(x>20 & x<=45) 1 else 0 # 20-45
 exp50 <- function(x) if(x>45 & x<=50) 1 else 0 # 45-50 (Want to see if old workers are more vulnerable)
-data$exp5 <- sapply(data$exp,exp5,na.rm = FALSE)
+data$exp5 <- sapply(data$exp,exp5)
 data$exp20 <- sapply(data$exp,exp20)
 data$exp45 <- sapply(data$exp,exp45)
 data$exp50 <- sapply(data$exp,exp50)
-summary(data[,41:49])
-#-----edu-exp cells-----------
-test <- data[1:2000,]
-test$exp5 <- sapply(data$exp,exp5,na.rm = FALSE)
+summary(data[,50:53])
+
+#-----skill groups-----------
+
+# less than high school edu by exp cells 
+data$skill[data$lesshigh==1 & data$exp5==1] <- 11 
+data$skill[data$lesshigh==1 & data$exp20==1] <- 12
+data$skill[data$lesshigh==1 & data$exp45==1] <- 13
+data$skill[data$lesshigh==1 & data$exp50==1] <- 14
+
+# general high school edu by exp cells 
+data$skill[data$high==1 & data$vocat == 0 & data$exp5==1] <- 21 
+data$skill[data$high==1 & data$vocat == 0 & data$exp20==1] <- 22
+data$skill[data$high==1 & data$vocat == 0 & data$exp45==1] <- 23
+data$skill[data$high==1 & data$vocat == 0 & data$exp50==1] <- 24
+
+# vocational (includes teacher training) high school edu by exp cells 
+data$skill[data$high==1 & data$vocat == 1 & data$exp5==1] <- 211
+data$skill[data$high==1 & data$vocat == 1 & data$exp20==1] <- 221
+data$skill[data$high==1 & data$vocat == 1 & data$exp45==1] <- 231
+data$skill[data$high==1 & data$vocat == 1 & data$exp50==1] <- 241
+
+# general post-sec edu by exp cells 
+data$skill[data$postsec==1 & data$vocat == 0 & data$exp5==1] <- 31 
+data$skill[data$postsec==1 & data$vocat == 0 & data$exp20==1] <- 32
+data$skill[data$postsec==1 & data$vocat == 0 & data$exp45==1] <- 33
+#data$skill[data$postsec==1 & data$exp50==1] <- 34 Impossible by construction
+
+# vocational (includes teacher training) post-sec edu by exp cells
+data$skill[data$postsec==1 & data$vocat == 1 & data$exp5==1] <- 311 
+data$skill[data$postsec==1 & data$vocat == 1 & data$exp20==1] <- 321
+data$skill[data$postsec==1 & data$vocat == 1 & data$exp45==1] <- 331
+
+# general college edu by exp cells 
+data$skill[data$college==1 & data$exp5==1] <- 41 
+data$skill[data$college==1 & data$exp20==1] <- 42
+data$skill[data$college==1 & data$exp45==1] <- 43
+#data$skill[data$college==1 & data$exp50==1] <- 44 Impossible by construction
+
+data$skill[data$grad==1] <- 50
+
+table(data$skill)
+
 
 #----------------------------
-# Wage
+# Quarter identifier 
 #----------------------------
 
+qtr <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
+data$qtr <- sapply(data$month,qtr) # assign quarters
+table(data$qtr)
+
+#----------------------------
+# working age pop 
+#----------------------------
+
+# HAVEN'T FIGURED THIS OUT YET!
+n <- ddply(subset(data), .(reg,cwt,qtr,year),   # by (region,province,quarter,year) invoke...
+                  function(x) data.frame(n=weighted.mean(x$weight,x$weight)))
+summary(n)
+n <- n[n$qtr==1 & n$year==2007,]
+
+#-----------------------------------------------
+# Wage by skill group i in province j at time t 
+#-----------------------------------------------
+
+wage <- data
+wage <- completeFun(wage, "amount") # remove rows with empty wages
+table(wage$wage.type) # 577770 obs with daily wage, 3228 obs with hrly wage, 4197 obs with wkly wage. I will keep only obs with daily wage
+wage <- wage[wage$wage.type == 2,]
 
 
-wage.df <- lfs
+#------Weighted average wage in skill cell-------------
 
-# edu level identifier
-wage.df <- completeFun(wage.df, "grade.b") # remove rows with no info on edu
-low.edu <- function(x) if(x < 400) 1 else 0 # lower upper secondary
-med.edu <- function(x) if(x > 400 & x < 600) 1 else 0 # upper secondary 
-high.edu <- function(x) if(x >= 600) 1 else 0 
-wage.df$low.edu <- sapply(wage.df$grade.b,low.edu)
-wage.df$med.edu <- sapply(wage.df$grade.b,med.edu)
-wage.df$high.edu <- sapply(wage.df$grade.b,high.edu)
-
-occup.df <- completeFun(wage.df, "occup") # remove rows with no info on occupation
-table(occup.df$occup)
-
-
-# erase obs witout wage amount
-wage.df <- completeFun(wage.df, "amount") 
-wage.df <- completeFun(wage.df, "wage.type")
-#table(wage.df$wage.type)
-wage.df <- wage.df[wage.df[,"wage.type"] == 2,] # keep only wage.type = daily wage (has by far largest obs.)
-#colnames(wage.df)
-
-# Create quarter identifier
-quarter <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
-wage.df$qtr <- sapply(wage.df$month,quarter) # assign quarters
-
-# Find weighted average wage in each cell 
-
-avgwage.df <- ddply(subset(wage.df), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
+w.pooled <- ddply(subset(wage), .(reg,cwt,qtr,year),   # by (region,province,quarter,year) invoke...
                            function(x) data.frame(wage=weighted.mean(x$amount, x$weight)))
 
-avgwage.lowedu.df <- ddply(subset(wage.df, low.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                      function(x) data.frame(wage_lowedu=weighted.mean(x$amount, x$weight)))
+#for (i in 1:length(skill.list)) {
+#  temp <- ddply(subset(wage,skill==skill.list[i]), .(reg,cwt,qtr,year),   
+#                function(x) data.frame(temp=weighted.mean(x$amount, x$weight)))
+#  if (i == 1) {wage.out <- merge(w.pooled,temp,by = c("year","qtr","reg","cwt"),all.x=TRUE)}
+#  else {wage.out <- merge(wage.out,temp,by = c("year","qtr","reg","cwt"),all.x=TRUE)}
+#    colnames(wage.out)[which(names(wage.out) == "temp")] <- paste("w",skill.list[i],sep="")
+#}
 
-avgwage.mededu.df <- ddply(subset(wage.df, med.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                           function(x) data.frame(wage_mededu=weighted.mean(x$amount, x$weight)))
+library("gtools") #required for smartbind (rbind with diff cols)
 
-#avgwage.highedu.df <- ddply(subset(wage.df, (med.edu==0 & low.edu==0)), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                           #function(x) data.frame(wage_highedu=weighted.mean(x$amount, x$weight)))
-
-avgwage.highedu.df <- ddply(subset(wage.df, (high.edu==1)), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                            function(x) data.frame(wage_highedu=weighted.mean(x$amount, x$weight)))
-
-
-# weighted monthly income in each cell
-
-y.df <- ddply(subset(wage.df), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                     function(x) data.frame(y=weighted.mean(x$approx, x$weight)))
-
-y.lowedu.df <- ddply(subset(wage.df, low.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                           function(x) data.frame(y_lowedu=weighted.mean(x$approx, x$weight)))
-
-y.mededu.df <- ddply(subset(wage.df, med.edu==1), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                           function(x) data.frame(y_mededu=weighted.mean(x$approx, x$weight)))
-
-y.highedu.df <- ddply(subset(wage.df, (high.edu==1)), .(reg,cwt,qtr,year),   # so by (province x quarter x year) invoke following function
-                            function(x) data.frame(y_highedu=weighted.mean(x$approx, x$weight)))
+for (i in 1:length(skill.list)) {
+  temp <- ddply(subset(wage,skill==skill.list[i]), .(reg,cwt,qtr,year),   
+                function(x) data.frame(wage=weighted.mean(x$amount, x$weight)))
+  temp$skill <- skill.list[i] 
+  if (i == 1) {wage.out <- smartbind(w.pooled,temp)}
+  else {wage.out <- smartbind(wage.out,temp)}
+}
 
 
-wage.df <- merge(avgwage.lowedu.df,avgwage.mededu.df,by = c("year","qtr","reg","cwt"))
-wage.df <- merge(wage.df,avgwage.highedu.df,by = c("year","qtr","reg","cwt"))
-wage.df <- merge(wage.df,avgwage.df,by = c("year","qtr","reg","cwt"))
-wage.df <- merge(wage.df,y.lowedu.df,by = c("year","qtr","reg","cwt"))
-wage.df <- merge(wage.df,y.mededu.df,by = c("year","qtr","reg","cwt"))
-wage.df <- merge(wage.df,y.highedu.df,by = c("year","qtr","reg","cwt"))
-wage.df <- merge(wage.df,y.df,by = c("year","qtr","reg","cwt"))
-
-write.table(wage.df,"wage.txt",sep="\t")
-
-rm(list=setdiff(ls(), "lfs")) # remove everthing except lfs
-
-#----------------------------
-# Compute income 
-#----------------------------
 
 
