@@ -1,6 +1,8 @@
+#----------------------------------------------
 # Less-skilled immigration and natives' outcomes
 # Spring 2016
 # Patcha Chaikitmongkol
+#----------------------------------------------
 
 rm(list=ls()) # clear workspace
 
@@ -287,6 +289,18 @@ table(data$qtr)
 
 write.table(data, "cleaned_lfs.txt",sep="\t") 
 
+#----------------------------
+# working age pop 
+#----------------------------
+# aggregate sampling weights by province in each survey quarter 
+agg.weight <- aggregate(data$weight, by=list(reg=data$reg,cwt=data$cwt,qtr=data$qtr,year=data$year), FUN=sum)
+# aggregate sampling weights by skill group in each province in each survey quarter 
+agg.weight.i <- aggregate(data$weight, by=list(skill=data$skill,reg=data$reg,cwt=data$cwt,qtr=data$qtr,year=data$year), FUN=sum)
+
+write.table(agg.weight.i, "i_aggweightout.txt",sep="\t") # pop output
+write.table(agg.weight, "aggweightout.txt",sep="\t") # pop output
+
+
 #-----------------------------------------------
 # Wage by skill group i in province j at time t 
 #-----------------------------------------------
@@ -300,7 +314,9 @@ wage <- wage[wage$wage.type == 2,]
 #------Weighted average wage in skill cell-------------
 
 w.pooled <- ddply(subset(wage), .(reg,cwt,qtr,year),   # by (region,province,quarter,year) invoke...
-                           function(x) data.frame(wage=weighted.mean(x$amount, x$weight)))
+          function(x) data.frame(wage=weighted.mean(x$amount, x$weight)))
+
+skill.list <- unique(data$skill)
 
 #for (i in 1:length(skill.list)) {
 #  temp <- ddply(subset(wage,skill==skill.list[i]), .(reg,cwt,qtr,year),   
@@ -325,10 +341,21 @@ write.table(wage.out, "wageout.txt",sep="\t") # wage output
 rm(list=setdiff(ls(), "data")) # remove everthing except data
 
 
-#----------------------------
-# working age pop 
-#----------------------------
-# aggregate sampling weights by province in each survey quarter 
-agg.weight <- aggregate(data$weight, by=list(reg=data$reg,cwt=data$cwt,qtr=data$qtr,year=data$year), FUN=sum)
+#-----------------------------------------------
+# Working hours by skill group i in province j at time t 
+#-----------------------------------------------
+# hours of worked for listed occup (main.hr)
+hours <- data
+hours <- completeFun(hours, "main.hr") # remove rows with no data
+summary(hours$main.hr) # 98 means 98 hours and above 
 
+for (i in 1:length(skill.list)) {
+  temp <- ddply(subset(hours,skill==skill.list[i]), .(reg,cwt,qtr,year),  # for each skill,reg,cwt,qtr,year
+                function(x) data.frame(hours=weighted.mean(x$main.hr, x$weight))) # find weighted avg of main.hr
+  temp$skill <- skill.list[i] 
+  if (i == 1) {hours.out <- temp}
+  else {hours.out <- smartbind(hours.out,temp)}
+}
+
+write.table(hours.out, "hours.txt",sep="\t") # main hours output 
 
