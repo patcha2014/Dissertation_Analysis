@@ -285,15 +285,7 @@ qtr <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else i
 data$qtr <- sapply(data$month,qtr) # assign quarters
 table(data$qtr)
 
-#----------------------------
-# working age pop 
-#----------------------------
-
-# HAVEN'T FIGURED THIS OUT YET!
-n <- ddply(subset(data), .(reg,cwt,qtr,year),   # by (region,province,quarter,year) invoke...
-                  function(x) data.frame(n=weighted.mean(x$weight,x$weight)))
-summary(n)
-n <- n[n$qtr==1 & n$year==2007,]
+write.table(data, "cleaned_lfs.txt",sep="\t") 
 
 #-----------------------------------------------
 # Wage by skill group i in province j at time t 
@@ -328,6 +320,15 @@ for (i in 1:length(skill.list)) {
   else {wage.out <- smartbind(wage.out,temp)}
 }
 
+write.table(wage.out, "wageout.txt",sep="\t") # wage output 
 
+rm(list=setdiff(ls(), "data")) # remove everthing except data
+
+
+#----------------------------
+# working age pop 
+#----------------------------
+# aggregate sampling weights by province in each survey quarter 
+agg.weight <- aggregate(data$weight, by=list(reg=data$reg,cwt=data$cwt,qtr=data$qtr,year=data$year), FUN=sum)
 
 
