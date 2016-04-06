@@ -336,6 +336,12 @@ for (i in 1:length(skill.list)) {
   else {wage.out <- smartbind(wage.out,temp)}
 }
 
+# check data ----------------
+summary(wage.out)
+# 3208 obs have weighted avg daily wage > 1,000
+# 184 ... > 10,000
+check <- data[data$skill<]
+
 write.table(wage.out, "wageout.txt",sep="\t") # wage output 
 
 rm(list=setdiff(ls(), "data")) # remove everthing except data
