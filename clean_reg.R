@@ -16,7 +16,7 @@ cleanreg <- temp
 colnames(cleanreg)[which(names(cleanreg) == "x")] <- "aggweight"
 
 # Create year-qtr ID 
-cleanreg$time_id <- paste(cleanreg$year,cleanreg$qtr,sep="-")
+cleanreg$time_id <- paste(cleanreg$year,cleanreg$qtr,sep="q")
 
 
 # Import weighted avg daily wage in each skill cell i, province j in each quarter
@@ -26,12 +26,22 @@ summary(cleanreg) # max weighted daily wage = 99,999
 #count(cleanreg$wage>1000) # 99 obs 
 #count(cleanreg$wage>5000) # 30 obs 
 #count(cleanreg$wage>10000) # 16 obs 
+tapply(cleanreg$wage, cleanreg$skill, mean, na.rm=TRUE)
 
 
 # Import working hours 
 temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/hours.txt",sep="\t")
 cleanreg <- merge(cleanreg,temp,by= c("year","qtr","reg","cwt","skill"),all.x=TRUE)
 summary(cleanreg) # max weighted daily wage = 99,999 
+tapply(cleanreg$hours, cleanreg$skill, mean, na.rm=TRUE)
+
+
+# Import job complexity 
+temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/ilo_comp.txt",sep="\t")
+cleanreg <- merge(cleanreg,temp,by= c("year","qtr","reg","cwt","skill"),all.x=TRUE)
+summary(cleanreg)  
+tapply(cleanreg$ilo.comp, cleanreg$skill, mean, na.rm=TRUE)
+
 
 
 # Import immigrant data 
@@ -40,6 +50,10 @@ colnames(temp) <- c("year","qtr","reg","cwt","imm_avg","imm_max")
 cleanreg <- merge(cleanreg,temp,by= c("year","qtr","reg","cwt"),all.x=TRUE)
 summary(cleanreg)
 
+
+
+
+rm(list=setdiff(ls(), "cleanreg")) # remove everthing except lfs
 
 write.table(cleanreg, "/Users/Mint/Dropbox/Dissertation_Data/cleanreg.txt",sep="\t") # output for stata
 # --------- let's try reduced form -------------

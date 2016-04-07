@@ -172,10 +172,11 @@ write.table(lfs, "lfs.txt",sep="\t") #save cleaned LFS file
 #----------------------------
 
 lfs <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/lfs.txt",sep="\t") #Import cleaned LFS file
+rm(list=setdiff(ls(), "lfs")) # remove everthing except lfs
 
 data  <- lfs 
 colnames(data)
-summary(data$grade.b) #education levels
+#summary(data$grade.b) #education levels
 
 # function for removing rows with NAs
 completeFun <- function(data, desiredCols) {
@@ -240,16 +241,16 @@ summary(data[,50:53])
 #-----skill groups-----------
 
 # less than high school edu by exp cells 
-data$skill[data$lesshigh==1 & data$exp5==1] <- 11 
-data$skill[data$lesshigh==1 & data$exp20==1] <- 12
-data$skill[data$lesshigh==1 & data$exp45==1] <- 13
-data$skill[data$lesshigh==1 & data$exp50==1] <- 14
+data$skill[data$lesshigh==1 & data$exp5==1] <- 110 
+data$skill[data$lesshigh==1 & data$exp20==1] <- 120
+data$skill[data$lesshigh==1 & data$exp45==1] <- 130
+data$skill[data$lesshigh==1 & data$exp50==1] <- 140
 
 # general high school edu by exp cells 
-data$skill[data$high==1 & data$vocat == 0 & data$exp5==1] <- 21 
-data$skill[data$high==1 & data$vocat == 0 & data$exp20==1] <- 22
-data$skill[data$high==1 & data$vocat == 0 & data$exp45==1] <- 23
-data$skill[data$high==1 & data$vocat == 0 & data$exp50==1] <- 24
+data$skill[data$high==1 & data$vocat == 0 & data$exp5==1] <- 210 
+data$skill[data$high==1 & data$vocat == 0 & data$exp20==1] <- 220
+data$skill[data$high==1 & data$vocat == 0 & data$exp45==1] <- 230
+data$skill[data$high==1 & data$vocat == 0 & data$exp50==1] <- 240
 
 # vocational (includes teacher training) high school edu by exp cells 
 data$skill[data$high==1 & data$vocat == 1 & data$exp5==1] <- 211
@@ -258,9 +259,9 @@ data$skill[data$high==1 & data$vocat == 1 & data$exp45==1] <- 231
 data$skill[data$high==1 & data$vocat == 1 & data$exp50==1] <- 241
 
 # general post-sec edu by exp cells 
-data$skill[data$postsec==1 & data$vocat == 0 & data$exp5==1] <- 31 
-data$skill[data$postsec==1 & data$vocat == 0 & data$exp20==1] <- 32
-data$skill[data$postsec==1 & data$vocat == 0 & data$exp45==1] <- 33
+data$skill[data$postsec==1 & data$vocat == 0 & data$exp5==1] <- 310 
+data$skill[data$postsec==1 & data$vocat == 0 & data$exp20==1] <- 320
+data$skill[data$postsec==1 & data$vocat == 0 & data$exp45==1] <- 330
 #data$skill[data$postsec==1 & data$exp50==1] <- 34 Impossible by construction
 
 # vocational (includes teacher training) post-sec edu by exp cells
@@ -268,13 +269,13 @@ data$skill[data$postsec==1 & data$vocat == 1 & data$exp5==1] <- 311
 data$skill[data$postsec==1 & data$vocat == 1 & data$exp20==1] <- 321
 data$skill[data$postsec==1 & data$vocat == 1 & data$exp45==1] <- 331
 
-# general college edu by exp cells 
-data$skill[data$college==1 & data$exp5==1] <- 41 
-data$skill[data$college==1 & data$exp20==1] <- 42
-data$skill[data$college==1 & data$exp45==1] <- 43
+# general college edu by exp cells (vocational shares same code as general)
+data$skill[data$college==1 & data$exp5==1] <- 410 
+data$skill[data$college==1 & data$exp20==1] <- 420
+data$skill[data$college==1 & data$exp45==1] <- 430
 #data$skill[data$college==1 & data$exp50==1] <- 44 Impossible by construction
 
-data$skill[data$grad==1] <- 50
+data$skill[data$grad==1] <- 500
 
 table(data$skill)
 
@@ -316,7 +317,7 @@ wage <- wage[wage$wage.type == 2,]
 w.pooled <- ddply(subset(wage), .(reg,cwt,qtr,year),   # by (region,province,quarter,year) invoke...
           function(x) data.frame(wage=weighted.mean(x$amount, x$weight)))
 
-skill.list <- unique(data$skill)
+skill.list <- unique(data$skill) # Create list of skill groups
 
 #for (i in 1:length(skill.list)) {
 #  temp <- ddply(subset(wage,skill==skill.list[i]), .(reg,cwt,qtr,year),   
@@ -339,8 +340,8 @@ for (i in 1:length(skill.list)) {
 # check data ----------------
 summary(wage.out)
 # 3208 obs have weighted avg daily wage > 1,000
-# 184 ... > 10,000
-check <- data[data$skill<]
+# 184 obs have weighted avg daily wage > 10,000
+
 
 write.table(wage.out, "wageout.txt",sep="\t") # wage output 
 
@@ -364,4 +365,29 @@ for (i in 1:length(skill.list)) {
 }
 
 write.table(hours.out, "hours.txt",sep="\t") # main hours output 
+
+
+#-----------------------------------------------
+# Job complexity by skill group i in province j at time t 
+#-----------------------------------------------
+complexity <- data 
+complexity <- completeFun(complexity, "occup") # remove rows with no data on occupations
+
+# ISCO-08 major groups to 4 skill levels 
+complexity$occup1d <- substring(complexity$occup, 1,1) # get first digit of occup (4-digit ISCO)
+ilo_comp <- function(x) if(x==1) 3.5 else if(x==2) 4 else if(x==3) 3 else if(x==9) 1 else 2 
+complexity$ilo_comp <- sapply(complexity$occup1d,ilo_comp) # assign job complexity to obs
+tapply(complexity$ilo_comp, complexity$skill, summary) # summary statistics by skill groups 
+
+
+for (i in 1:length(skill.list)) {
+  temp <- ddply(subset(complexity,skill==skill.list[i]), .(reg,cwt,qtr,year),  # for each skill,reg,cwt,qtr,year
+                function(x) data.frame(ilo_comp=weighted.mean(x$ilo_comp, x$weight))) # weighted avg of ilo_comp
+  temp$skill <- skill.list[i] 
+  if (i == 1) {ilo_comp.out <- temp}
+  else {ilo_comp.out <- smartbind(ilo_comp.out,temp)}
+}
+tapply(ilo_comp.out$ilo_comp, ilo_comp.out$skill, mean) # summary statistics by skill groups 
+
+write.table(ilo_comp.out, "ilo_comp.txt",sep="\t") #  job complexity output 
 
