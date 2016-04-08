@@ -9,6 +9,9 @@ library("AER")
 library("Hmisc") # get spss (.sav), csv files
 library("plyr")
 
+rm(list=ls()) # clear workspace
+
+
 
 # Start from importing pop size in each skill cell i, province j in each quarter --> full panel 
 temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/i_aggweightout.txt",sep="\t")
@@ -46,7 +49,6 @@ tapply(cleanreg$ilo.comp, cleanreg$skill, mean, na.rm=TRUE)
 
 # Import immigrant data 
 temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/Imm_dat/limm_moments.txt",sep="\t") 
-colnames(temp) <- c("year","qtr","reg","cwt","imm_avg","imm_max")
 cleanreg <- merge(cleanreg,temp,by= c("year","qtr","reg","cwt"),all.x=TRUE)
 summary(cleanreg)
 

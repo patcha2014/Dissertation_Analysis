@@ -8,10 +8,9 @@ library("Hmisc") # get spss (.sav), csv files
 library("xlsx")
 #library("plyr")
 
-#----------------------
-# Importing excel files
-#----------------------
-
+#-------------------------------------------------------
+# Import imm work permit data by province, monnth, year
+#-------------------------------------------------------
 
 month <- paste("Sheet",seq(1,12,1),sep="") # Create list of sheet names within each excel file we need to import. Sheet1 is January and so on
 year <- c("2007","2008","2009","2010","2011","2012","2013","2014","2015")
@@ -253,9 +252,55 @@ limm.max.df$max <- sapply(limm.max.df$x,positive)
 
 limm.moments <- cbind(limm.average.df,limm.max.df[,"max"])
 colnames(limm.moments) <- c("yr","qtr","reg","cwt","limm.avg","limm.max")
+
+
 #-------export file------------
 write.table(limm.moments,"limm_moments.txt",sep="\t")
 
-limm.moments <- csv.get("limm_moments.txt",sep="\t") # import back in
+#-----------------------------------------------------------------
+# Import imm work permit data by countries of origin, month, year
+# This will be used as an instrument 
+#-----------------------------------------------------------------
+
+# Import data
+data <- read.xlsx("/Users/Mint/Dropbox/Dissertation_Data/Imm_dat/limm_by_mlc.xlsx", sheetIndex=3)
+data$mya <- data$mya_l + data$mya_il # combine legals + illegals
+data$lao <- data$lao_l + data$lao_il
+data$cam <- data$cam_l + data$cam_il
+colnames(data)
+data <- data[,-(3:8)] # keep only combined data
+
+# assign quaters
+qtr <- function(x) if(x==1 | x==2 | x==3) 1 else if(x==4 | x==5 | x==6) 2 else if(x==7 | x==8 | x==9) 3 else 4
+data$qtr <- sapply(data$month,qtr) # assign quarters
+
+# find averge 
+for (i in 1:length(countrylist)) {
+  temp <- aggregate(data[,i+2], # mya = col 3, lao = col 4, cam = col 5
+                    list(year = data$year, qtr = data$qtr),mean,na.rm=TRUE) # find mean for each qtr-yr
+  colnames(temp)[which(names(temp) == "x")] <- paste("agg",paste(countrylist[i],"avg",sep="_"),sep="_")
+  if (i==1) avg.limm.agg <- temp 
+  else avg.limm.agg <- merge(avg.limm.agg,temp,by=c("year","qtr"))
+}
+
+# find max
+for (i in 1:length(countrylist)) {
+  temp <- aggregate(data[,i+2], # mya = col 3, lao = col 4, cam = col 5
+                    list(year = data$year, qtr = data$qtr),max,na.rm=FALSE)
+  colnames(temp)[which(names(temp) == "x")] <- paste("agg",paste(countrylist[i],"max",sep="_"),sep="_")
+  if (i==1) max.limm.agg <- temp 
+  else max.limm.agg <- merge(max.limm.agg,temp,by=c("year","qtr"))
+}
+
+# ------------ merge to data from first part --------------
+limm.moments <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/Imm_dat/limm_moments.txt",sep="\t") # import back in
+colnames(limm.moments)[which(names(limm.moments) == "yr")] <- "year" # change colname yr to year
+colnames(limm.moments)[which(names(limm.moments) == "limm.max")] <- "limm_max" # change colname yr to year
+colnames(limm.moments)[which(names(limm.moments) == "limm.avg")] <- "limm_avg" # change colname yr to year
+limm.moments <- merge(limm.moments,avg.limm.agg,by=c("year","qtr"))
+limm.moments <- merge(limm.moments,max.limm.agg,by=c("year","qtr"))
+
+#-------export file------------
+write.table(limm.moments,"/Users/Mint/Dropbox/Dissertation_Data/Imm_dat/limm_moments.txt",sep="\t")
 
 
