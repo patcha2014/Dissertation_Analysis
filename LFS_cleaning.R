@@ -391,3 +391,17 @@ tapply(ilo_comp.out$ilo_comp, ilo_comp.out$skill, mean) # summary statistics by 
 
 write.table(ilo_comp.out, "ilo_comp.txt",sep="\t") #  job complexity output 
 
+
+#-----------------------------------------------
+# Unemployment rate by skill group i in province j at time t 
+#-----------------------------------------------
+# Import cleaned LFS data
+# temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/cleaned_lfs.txt",sep="\t")
+unemp <- temp 
+table(unemp$dr.unem) # a lot of NAs
+summary(unemp$absent) # a lot of NAs
+summary(unemp$wk.7day) # a lot of NAs
+table(unemp$wk.7day)
+notwk <- unemp[unemp$wk.7day==2,]
+summary(notwk$ever.wk)
+table(notwk$ever.wk)
