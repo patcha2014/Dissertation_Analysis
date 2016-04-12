@@ -64,10 +64,15 @@ cleanreg <- merge(cleanreg,temp,by= c("year","qtr","reg","cwt","skill"),all.x=TR
 summary(cleanreg)  
 tapply(cleanreg$ilo.comp, cleanreg$skill, mean, na.rm=TRUE)
 
+
+#--------------------------------------------------
+# RHS variable: Immigrants 
+#--------------------------------------------------
 # Import immigrant data 
 temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/Imm_dat/limm_moments.txt",sep="\t") 
 cleanreg <- merge(cleanreg,temp,by= c("year","qtr","reg","cwt"),all.x=TRUE)
 summary(cleanreg)
+
 
 # Create year-qtr ID 
 cleanreg$time_id <- paste(cleanreg$year,cleanreg$qtr,sep="q")

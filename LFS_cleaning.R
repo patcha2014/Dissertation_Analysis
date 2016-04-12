@@ -396,7 +396,7 @@ write.table(ilo_comp.out, "ilo_comp.txt",sep="\t") #  job complexity output
 # Unemployment rate by skill group i in province j at time t 
 #-----------------------------------------------
 # Import cleaned LFS data
-# temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/cleaned_lfs.txt",sep="\t")
+#temp <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/LFS/cleaned_lfs.txt",sep="\t")
 unemp <- temp 
 table(unemp$dr.unem) # a lot of NAs
 summary(unemp$absent) # a lot of NAs
