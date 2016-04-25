@@ -165,6 +165,12 @@ lfs$year <- lfs$yr + 1957 # change year format e.g. from 58 to 2015
 
 write.table(lfs, "lfs.txt",sep="\t") #save cleaned LFS file
 
+#----------------------------
+# Import cleaned LFS file
+#----------------------------
+
+
+
 
 
 #----------------------------
@@ -346,6 +352,9 @@ summary(wage.out)
 write.table(wage.out, "wageout.txt",sep="\t") # wage output 
 
 rm(list=setdiff(ls(), "data")) # remove everthing except data
+
+
+
 
 
 #-----------------------------------------------
