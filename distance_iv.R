@@ -65,51 +65,85 @@ bkk.mya <- nearest.d$nearest.d[nearest.d$combo=="10-mya"]
 bkk.cam <- nearest.d$nearest.d[nearest.d$combo=="10-cam"]
 bkk.lao <- nearest.d$nearest.d[nearest.d$combo=="10-lao"]
 
-# create normalized nearest distance with distance of bkk to origin = 1 for each country 
-nearest.d$norm.d <-  0
-nearest.d$norm.d[nearest.d$origin=="mya"] <- nearest.d$nearest.d[nearest.d$origin=="mya"] / bkk.mya
-nearest.d$norm.d[nearest.d$origin=="cam"] <- nearest.d$nearest.d[nearest.d$origin=="cam"] / bkk.cam
-nearest.d$norm.d[nearest.d$origin=="lao"] <- nearest.d$nearest.d[nearest.d$origin=="lao"] / bkk.lao
-
-origin <- c("mya","lao","cam")
-nearest.d$d.x <- NA # create empty col
-for (i in 1:length(origin)) {
-  sum.temp <- sum(nearest.d$norm.d[nearest.d$origin==origin[i]]) # sum up norm.d for each country 
-  x.temp <- 1/sum.temp # 
-  nearest.d$d.x[nearest.d$origin==origin[i]] <- nearest.d$norm.d[nearest.d$origin==origin[i]]*x.temp
-  sum(nearest.d$d.x[nearest.d$origin==origin[i]]) # sum up to 1 
-} 
+# create inverse normalized nearest distance with distance of bkk to origin = 1 for each country 
+nearest.d$inv.d <-  0
+nearest.d$inv.d[nearest.d$origin=="mya"] <- 1/ (nearest.d$nearest.d[nearest.d$origin=="mya"] / bkk.mya)
+nearest.d$inv.d[nearest.d$origin=="cam"] <- 1/ (nearest.d$nearest.d[nearest.d$origin=="cam"] / bkk.cam)
+nearest.d$inv.d[nearest.d$origin=="lao"] <- 1/ (nearest.d$nearest.d[nearest.d$origin=="lao"] / bkk.lao)
 
 # reshape data frame
-d.iv.temp <- nearest.d[c(2,3,7)] # keep only destination, origin, d.x 
+d.iv.temp <- nearest.d[c(2,3,6)] # keep only destination, origin, inv.d
 library(reshape)
 d.iv.temp <- reshape(d.iv.temp, timevar="origin", idvar="cwt",direction="wide")
 
-# merge with immigrant data
-imm.iv <- merge(imm.iv,d.iv.temp,by="cwt")
-imm.iv$d.iv.mya <- imm.iv$agg.mya.avg*imm.iv$d.x.mya
-imm.iv$d.iv.cam <- imm.iv$agg.mya.avg*imm.iv$d.x.cam
-imm.iv$d.iv.lao <- imm.iv$agg.mya.avg*imm.iv$d.x.lao
+
 
 #-----------------------------------------------
-# Road distance
+# Immigrant data 
 #-----------------------------------------------
 
 imm<- csv.get("/Users/Mint/Dropbox/Dissertation_Data/Imm_dat/limm_moments.txt",sep="\t")
 
 
-imm.iv <- imm[c(1:4,7:9)] # subsetting data to only average imm stocks by country in each qtr
-summary(imm.iv) 
-
+temp <- imm[c(1:4,7:9)] # subsetting data to only average imm stocks by country in each qtr
+summary(temp) 
 
 # remove rows with no data on imm by origin 
 completeFun <- function(data, desiredCols) {
   completeVec <- complete.cases(data[, desiredCols])
   return(data[completeVec, ])
 }
-imm.iv <- completeFun(imm.iv, "agg.mya.avg") 
-summary(imm.iv)
+temp <- completeFun(temp, "agg.mya.avg") 
+summary(temp)
+
+#-----------------------------------------------
+# Merge distance and imm data 
+#-----------------------------------------------
+
+# merge with immigrant data
+temp <- merge(temp,d.iv.temp,by="cwt")
+
+# multiply immigrant from origin k with inverse normalized distance of province j from origin k 
+temp$interact.mya <- temp$agg.mya.avg * temp$inv.d.mya
+temp$interact.cam <- temp$agg.cam.avg * temp$inv.d.cam
+temp$interact.lao <- temp$agg.lao.avg * temp$inv.d.lao
+
+temp$z.border <- temp$interact.mya + temp$interact.cam + temp$interact.lao
+
+border.iv <- temp[c(1:4,14)]
 
 
+write.table(border.iv, "/Users/Mint/Dropbox/Dissertation_Data/distance/border.iv.txt",sep="\t") # output 
+
+#-----------------------------------------------
+# Test power of iv
+#-----------------------------------------------
+
+#install.packages("mvtnorm")
+library(AER) ; library(foreign) ; library(mvtnorm)
+
+test <- imm[c(1:5)]
+test <- merge(test,border.iv,by=c("year","qtr","reg","cwt"))
+
+cleanreg <- csv.get("/Users/Mint/Dropbox/Dissertation_Data/cleanreg.txt",sep="\t")
+cleanreg <- merge(cleanreg,test,by=c("year","qtr","reg","cwt"))
 
 
+cleanreg <- completeFun(cleanreg, "limm.avg.x"); cleanreg <- completeFun(cleanreg,"z.border"); cleanreg <- completeFun(cleanreg,"rel.native.lf")
+
+cleanreg$log.imm <- log(cleanreg$limm.avg.x)
+cleanreg$log.z.border <- log(cleanreg$z.border)
+cleanreg$log.lf <- log(cleanreg$rel.native.lf)
+
+# first stage 
+fs <- lm(log.imm ~ log.lf + log.z.border, data=cleanreg)
+# null first stage (exclude iv)
+fn <- lm(log.imm ~ log.lf , data=cleanreg)
+
+# simple F-test
+waldtest(fs, fn)$F[2]
+# F-test robust to heteroskedasticity
+waldtest(fs, fn, vcov = vcovHC(fs, type="HC0"))$F[2]
+# F-test robust to clustering
+# Need to run r script "clusterVCV.R" first
+waldtest(fs, fn, vcov = clusterVCV(cleanreg, fs, cluster1="cwt"))$F[2]

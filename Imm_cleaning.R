@@ -6,7 +6,13 @@ library("foreign")
 library("AER")
 library("Hmisc") # get spss (.sav), csv files
 library("xlsx")
-#library("plyr")
+library("plyr")
+
+# Function for removing rows with NAs
+completeFun <- function(data, desiredCols) {
+  completeVec <- complete.cases(data[, desiredCols])
+  return(data[completeVec, ])
+}
 
 #-------------------------------------------------------
 # Import imm work permit data by province, monnth, year
@@ -19,22 +25,60 @@ filename <- paste(paste("imm",year,sep=""),"xlsx",sep=".") # List of file names.
 
 setwd("/Users/Mint/Dropbox/Dissertation_Data/Imm_dat")
 
+#-------import in loop-----------
+
+for (k in 1:length(year)){
+  for (i in 1:length(month)) {
+    temp <- read.xlsx(filename[k],sheetName=month[i])
+    temp$mo <- i # month variable
+    temp$yr <- year[k] # year variable 
+    if (k == 1 & i == 1) dat <- temp 
+    else dat <- rbind.fill(imm.dat,temp)
+  }
+}
+
+imm.dat <- dat 
+
+# Remove columns we don't need. These don't have col name in original data. Appear here as NA... 
+imm.dat <- imm.dat[, grep("^(NA)", names(imm.dat), value = TRUE, invert = TRUE)] # Remove columns of which names start with NA. 
+
+
+#-------removing some rows------------
+
+imm.dat <- completeFun(imm.dat, "cwt") # remove rows without province ID. These are regional data, and sub-districts in Bangkok 
+imm.dat <- completeFun(imm.dat, "reg") # Bkk data appeared twice in each year--one row has reg ID and the other doesn't. Remove row without reg ID. 
+imm.dat <- completeFun(imm.dat, "total") # remove rows in which "total" (total stock of all immigrants) contains NA. Data cannot be imported for these rows.
+
+
+#--------sum up less-skilled immigrants "limm"------------
+# Note: there are changes in categories of work permits over time.
+imm.dat[is.na(imm.dat)] <- 0
+
+
+
 #--------2007----------
 
-k <- 1 
-month.temp <- read.xlsx(filename[k], sheetName=month[1])
-month.temp$mo <- 1 # Month identifier
-year.temp <- month.temp
-for (i in 2:12) {
+k <- 1
+for (i in 1:12) {
   month.temp <- read.xlsx(filename[k], sheetName=month[i])
   month.temp$mo <- i
-  year.temp <- rbind.fill(year.temp,month.temp) 
+  if (i == 1) temp <- month.temp
+  else temp <- rbind.fill(temp,month.temp) 
 }
-year.temp$yr <- year[k] # Year identifier
+temp$yr <- year[k] # Year identifier
 
-year.temp$cal1 <- as.numeric(as.character(year.temp$il_ht)) # Minorities
+# Stock of less-skilled labors "limm"
+temp$limm_f <- temp$il_mlc_f  
+
+
+
+year.temp$cal1 <- as.numeric(as.character(year.temp$il_ht)) # Ethnic minorities
+year.temp$cal1[is.na(year.temp$cal1)] <- 0 # change NA to 0 
+
 year.temp$cal2 <- as.numeric(as.character(year.temp$il_mlc)) # Myanmese, Laotian, Cambodian
-year.temp$limm <- year.temp$cal1 + year.temp$cal2 # Less-skilled imm = minorities + mlc
+year.temp$cal2[is.na(year.temp$cal2)] <- 0 # change NA to 0 
+
+year.temp$limm <- year.temp$cal1 + year.temp$cal2 # limm = minorities + mlc
 
 imm.dat <- as.data.frame(cbind(year.temp$yr,year.temp$mo,year.temp$cwt,year.temp$reg,year.temp$limm))
 colnames(imm.dat) <- c("yr","mo","cwt","reg","limm")
@@ -42,13 +86,11 @@ colnames(imm.dat) <- c("yr","mo","cwt","reg","limm")
 #--------2008----------
 
 k <- 2
-month.temp <- read.xlsx(filename[k], sheetName=month[1])
-month.temp$mo <- 1 # Month identifier
-year.temp <- month.temp
-for (i in 2:12) {
+for (i in 1:12) {
   month.temp <- read.xlsx(filename[k], sheetName=month[i])
   month.temp$mo <- i
-  year.temp <- rbind.fill(year.temp,month.temp) 
+  if (i == 1) year.temp <- month.temp
+  else year.temp <- rbind.fill(year.temp,month.temp) 
 }
 year.temp$yr <- year[k] # Year identifier
 
@@ -57,6 +99,9 @@ year.temp$cal2 <- as.numeric(as.character(year.temp$l_mou_nat)) # MOU proof of n
 year.temp$cal3 <- as.numeric(as.character(year.temp$il_ht)) # Minorities
 year.temp$cal4 <- as.numeric(as.character(year.temp$il_mlc)) # Myanmese, Laotian, Cambodian
 year.temp$limm <- year.temp$cal1 + year.temp$cal2 + year.temp$cal3 + year.temp$cal4
+
+year.temp$limm <- 
+
 
 imm.dat.temp <- as.data.frame(cbind(year.temp$yr,year.temp$mo,year.temp$cwt,year.temp$reg,year.temp$limm))
 colnames(imm.dat.temp) <- c("yr","mo","cwt","reg","limm")
@@ -223,15 +268,6 @@ colnames(imm.dat.temp) <- c("yr","mo","cwt","reg","limm")
 imm.dat <- rbind(imm.dat,imm.dat.temp)
 
 
-#-------keep only province level obs--------
-
-completeFun <- function(data, desiredCols) {
-  completeVec <- complete.cases(data[, desiredCols])
-  return(data[completeVec, ])
-}
-
-imm.dat <- completeFun(imm.dat, "cwt") # remove rows without province ID
-imm.dat <- completeFun(imm.dat, "reg") # Bkk data appeared twice in each year--one row has reg ID and the other doesn't. Remove row without reg ID. 
 
 #-------export file------------
 write.table(imm.dat,"imm.txt",sep="\t")
