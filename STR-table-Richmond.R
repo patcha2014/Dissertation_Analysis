@@ -212,12 +212,22 @@ eduindus.df <- eduindus.df[ , -which(names(eduindus.df) %in% c("x.x","x.y"))] # 
 eduindus.df$edulev <- factor(eduindus.df$edulev, levels = c("lessthanhigh","high","postsec","colgrad","master","phd"))
 eduindus.df$cohort <- factor(eduindus.df$cohort, levels = c(B,A))
 
+eduindus.df$indus <- factor(eduindus.df$indus, 
+                            levels = c("A.agri","B.mining","C.manuf","F.construct","G.sales",
+                                       "H.logistics_transport","I.hotel_restuarant",
+                                       "J.info_communication","K.finanservice",
+                                       "M.professionals","O.gov_military","P.eduservice",
+                                       "Q.health_socservice","T.domesticservice",
+                                       "Z.allothers","Z.unem"))
 
 # Create plots 
 #-------------------------
 
 pick.cohort = A 
 #pick.cohort = B
+
+
+
 
 pick.year = 2007
 ggplot(eduindus.df[eduindus.df$year==pick.year & eduindus.df$cohort==pick.cohort,], aes(x=edulev, y=fraction, fill=indus),) +
@@ -246,106 +256,3 @@ ggplot(eduindus.df[eduindus.df$year==pick.year & eduindus.df$cohort==pick.cohort
   dev.copy(png, paste0(paste(paste0("Edu-Indus",pick.year),pick.cohort,sep="-"),".png"))
   dev.off()     
 
-
-  
-
-
-# reshape data long to wide 
-temp2 <- temp1[temp1$qtr==1,] # keep only 1st quarter data
-temp2 <- temp2[,-c(1)] # remove qtr column
-temp2 <- cast(temp2, indus~year, value='fraction') # reshape long to wide
-# reorder rows
-#target <- c("agri","fisheries","foodmanuf","garment","electronics","motors","construct","retails","allothers")
-#temp2 <- temp2[match(target, temp2$indus),]
-
-# Select one by one
-temp2$edulev <- "Less than high school"
-#temp2$edulev <- "High school"
-#temp2$edulev <- "Post secondary"
-#temp2$edulev <- "College grads"
-
-# Only the first edulev category use first row, the rest use second row
-indus_edu <- temp2
-#indus_edu <- rbind(indus_edu, temp2)
-
-
-# Before this repeat all edu cat first 
-indus_edu <- indus_edu[,-c(3:9)] # keep only 2007 and 2015
-colnames(indus_edu) <- c("Industry","Frac2007","Frac2015","EduLevel")
-
-# export table 
-write.table(indus_edu, "/Users/Mint/Desktop/indus_edu.txt",sep="\t")
-
-
-#----------------------------
-# Plot stacked bar charts
-#----------------------------
-indus_edu_plot <- indus_edu
-#indus_edu_plot <- subset(indus_edu, indus_edu$Industry != "allothers" & indus_edu$Industry != "retails" ) # remove retails and allothers indus cat. Don't want to include in the plots 
-
-# Make EduLevel a factor to make it goes in this order in the plots
-indus_edu_plot$edulev <- factor(indus_edu_plot$edulev, levels = c("Less than high school", "High school",  "Post secondary", "College grads"))
-indus_edu_plot$Industry <- factor(indus_edu_plot$Industry, levels = c("agri","fisheries","foodmanuf","garment","electronics","motors","construct"))
-
-colnames(indus_edu_plot)
-colnames(indus_edu_plot) <- c("Industry","Frac2007","EduLevel")
-
-
-ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2007, fill=Industry),) +
-  geom_bar(stat="identity") + 
-  xlab("\nEducation Level") +
-  ylab("Fraction of workers (2007)\n") + 
-  guides(fill=FALSE) + 
-  theme_bw() +
-  coord_flip() +
-  scale_y_reverse() +
-  ylim(20, 0) +
-  guides(fill=guide_legend(title="Industry"))
-dev.copy(png,'Edu-Indus-2007.png')
-dev.off()
-
-ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2015, fill=Industry),) +
-  geom_bar(stat="identity") + 
-  xlab("\nEducation Level") +
-  ylab("Fraction of workers (2015)\n") + 
-  guides(fill=FALSE) + 
-  theme_bw() +
-  coord_flip() + 
-  ylim(0, 20) +
-  guides(fill=guide_legend(title="Industry"))
-dev.copy(png,'Edu-Indus-2015.png')
-dev.off()
-
-#----remove less than high school-----
-# make other level of education easy to see fractions of workers in each industry
-
-indus_edu_plot <- subset(indus_edu_plot, indus_edu_plot$EduLevel != "Less than high school") 
-
-ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2007, fill=Industry),) +
-  geom_bar(stat="identity") + 
-  xlab("\nEducation Level") +
-  ylab("Fraction of workers (2007)\n") + 
-  guides(fill=FALSE) + 
-  theme_bw() +
-  coord_flip() +
-  scale_y_reverse() +
-  ylim(5, 0) +
-  guides(fill=guide_legend(title="Industry"))
-dev.copy(png,'Edu-Indus-2007-highabove.png')
-dev.off()
-
-ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2015, fill=Industry),) +
-  geom_bar(stat="identity") + 
-  xlab("\nEducation Level") +
-  ylab("Fraction of workers (2015)\n") + 
-  guides(fill=FALSE) + 
-  theme_bw() +
-  coord_flip() + 
-  ylim(0, 5) +
-  guides(fill=guide_legend(title="Industry"))
-dev.copy(png,'Edu-Indus-2015-highabove.png')
-dev.off()
-
-#-------------------------
-# Education  
-#-------------------------
