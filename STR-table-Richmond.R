@@ -5,53 +5,59 @@
 #----------------------------------------------
 
 rm(list=ls()) # clear workspace
-# rm(list=setdiff(ls(), "data.raw")) # remove everything except data.raw
+# rm(list=setdiff(ls(), "data")) # remove everything except data.raw
 
 library("foreign")
 library("AER")
 library("Hmisc") # get spss (.sav), csv files
 library("plyr")
  
-setwd("/Users/Mint/Desktop")
+setwd("/Users/Mint/Desktop") # set work directory
 
 # Data of individuals age 16-65
 data.raw <- csv.get("/Users/Mint/Dropbox/Mint/Dissertation_Data/LFS/cleaned_lfs.txt",sep="\t")
-data <- data.raw
+
+# Use only qtr 1 data in each year
+data <- data.raw[data.raw$qtr==1,]
+
+#-------------------------
+# cohort identifier 
+#-------------------------
+
+# identifier for 20-24 yo cohort and 40-44 yo cohort
+a = 25; b = 30
+#a = 20; b = 25
+c = 45; d = 50 
+#c = 40; d = 45
+A = paste(paste0("age", a), b, sep="-")
+B = paste(paste0("age", c), d, sep="-")
+
+cohort.fn <- function(x) if(x>=a & x<=b) A  else
+                         if(x>=c & x<=d) B else NA
+
+data$cohort <- sapply(data$age, cohort.fn)
+table(data$cohort)
 
 #-------------------------
 # education identifier 
 #-------------------------
 
-edulev <- function(x) if(x < 400) "lessthanhigh" else 
+# write function to identify edu level 
+edulev.fn <- function(x) if(x < 400) "lessthanhigh" else 
                       if(x > 400 & x < 500) "high" else 
                       if(x > 500 & x < 600) "postsec" else 
                       if(x > 600 & x < 700) "colgrad" else 
-                      if(x > 700 & x < 800) "master" else NA
+                      if(x > 700 & x < 800) "master" else 
+                      if(x > 800 & x < 900) "phd" else NA
              
-data$edulev <- sapply(data$grade.b, edulev)
+# create edu level variable in the data frame
+data$edulev <- sapply(data$grade.b, edulev.fn)
+describe(data$grade.b); describe(data$edulev); table(data$edulev) # check new variable 
 
-# find weighted number of ppl in each edu level by year by qtr (sample period) -----
-
-# weighted count of obs by education level 
-pop_edulev <- aggregate(data$weight, by=list(qtr=data$qtr,year=data$year,edulev=data$edulev), FUN=sum) 
-
-# sum weights to find total number of pop in each qtr-year 
-# (Note: weight sys changes in year 2011)
-N <- aggregate(data$weight, by=list(qtr=data$qtr,year=data$year), FUN=sum)
-
-pop_edulev <- merge(pop_edulev, N, by=c("qtr","year")) # merge pop by edu level and total pop 
-pop_edulev$fraction <- pop_edulev$x.x / pop_edulev$x.y * 100 # fraction of pop in each edu level in working age pop (16-65)
-
-pop_edulev <- pop_edulev[,-c(4:5)] # remove unneccesary cols
-
-# reshape data long to wide 
-library(reshape)
-pop_edulev_out <- pop_edulev[pop_edulev$qtr==1,] # keep only 1st quarter data
-pop_edulev_out <- pop_edulev_out[,-c(1)] # remove qtr column
-pop_edulev_out <- cast(pop_edulev_out, year~edulev, value='fraction') # reshape long to wide
-# reorder columns
-pop_edulev_out <- pop_edulev_out[c("year","lessthanhigh","high","postsec","colgrad","master")]
-
+# write function to identify being in school 
+enroll.fn <- function(x) if(x==1) "finished" else "inschool" 
+data$enroll <- sapply(data$grade.a, enroll.fn) # create variable
+describe(data$grade.a); describe(data$enroll)
 
 #-------------------------
 # industry identifier 
@@ -65,63 +71,192 @@ table(data$indus) # industry variable in LFS data set
 # year 2007-2011, indus 01-09 have 3 digits input, 10-99 have 4 digits input. We will remove last two digits 
 # year 2012-2015, indus 01-09 have 4 digits input, 10-99 have 5 digits input. We will remove last three digits 
 
-substr.indus <- function(x,y) if(y>=2007 & y<=2011) substr(x, 1, nchar(x)-2) else 
-                            # for year 2007-2011, remove 2 last digits
+indus.2dg.fn <- function(x,y) if(y>=2007 & y<=2011) substr(x, 1, nchar(x)-2) else 
                               if(y>=2012 & y<=2015) substr(x, 1, nchar(x)-3) else NA 
-                            # for year 2011-2015, remove 3 last digits
-
 
 # create 2-digit industry variable
-data$indus_2dg <- mapply(substr.indus, data$indus, data$year)
+data$indus.2dg <- mapply(indus.2dg.fn, data$indus, data$year)
 
-# create function to assign indus name to industry we would like to look at 
-indus <- function(x,y) 
-                     if(y<=2010 & !is.na(x) & x==1) "agri" else
-                     if(y<=2010 & !is.na(x) & x==5) "fisheries" else
-                     if(y<=2010 & !is.na(x) & x>=15 & x<=16) "foodmanuf" else 
-                     if(y<=2010 & !is.na(x) & x==18) "garment" else 
-                     if(y<=2010 & !is.na(x) & x>=29 & x<=32) "electronics" else 
-                     if(y<=2010 & !is.na(x) & x==34) "motors" else 
-                     if(y<=2010 & !is.na(x) & x==45) "construct" else 
-                     if(y<=2010 & !is.na(x) & x==52) "retails" else 
-                       
-                     if(y>=2011 & !is.na(x) & x==1) "agri" else
-                     if(y>=2011 & !is.na(x) & x==3) "fisheries" else
-                     if(y>=2011 & !is.na(x) & x>=10 & x<=11) "foodmanuf" else 
-                     if(y>=2011 & !is.na(x) & x==14) "garment" else 
-                     if(y>=2011 & !is.na(x) & x>=26 & x<=27) "electronics" else 
-                     if(y>=2011 & !is.na(x) & x==29) "motors" else 
-                     if(y>=2011 & !is.na(x) & x==41) "construct" else 
-                     if(y>=2011 & !is.na(x) & x==47) "retails" else "allothers" 
+# create function to assign indus name based on indus code (exclude some small indus)
+
+indus.fn <- function(x,y) 
+  if(y<=2010 & !is.na(x) & x>=1 & x<=5) "A.agri" else
+    if(y<=2010 & !is.na(x) & x>=10 & x<=14) "B.mining" else
+      if(y<=2010 & !is.na(x) & x>=15 & x<=37) "C.manuf" else 
+        if(y<=2010 & !is.na(x) & x==45) "F.construct" else 
+          if(y<=2010 & !is.na(x) & x>=50 & x<=52) "G.sales" else 
+            if(y<=2010 & !is.na(x) & x>=60 & x<=63) "H.logistics_transport" else 
+              if(y<=2010 & !is.na(x) & x==55) "I.hotel_restuarant" else 
+                if(y<=2010 & !is.na(x) & x==64) "J.info_communication" else 
+                  if(y<=2010 & !is.na(x) & x>=65 & x<=67) "K.finanservice" else 
+                   #if(y<=2010 & !is.na(x) & x>=69 & x<=75) "M.professionals" else 
+                    if(y<=2010 & !is.na(x) & x>=64 & x<=67) "K.finanservice" else 
+                      if(y<=2010 & !is.na(x) & x==75) "O.gov_military" else    
+                        if(y<=2010 & !is.na(x) & x==80) "P.eduservice" else 
+                          if(y<=2010 & !is.na(x) & x==85) "Q.health_socservice" else 
+                            if(y<=2010 & !is.na(x) & x==95) "T.domesticservice" else 
+                              
+                              if(y>2010 & !is.na(x) & x>=1 & x<=3) "A.agri" else
+                                if(y>2010 & !is.na(x) & x>=5 & x<=9) "B.mining" else
+                                  if(y>2010 & !is.na(x) & x>=10 & x<=33) "C.manuf" else 
+                                    if(y>2010 & !is.na(x) & x>=43 & x<=45) "F.construct" else 
+                                      if(y>2010 & !is.na(x) & x>=45 & x<=47) "G.sales" else 
+                                        if(y>2010 & !is.na(x) & x>=49 & x<=53) "H.logistics_transport" else 
+                                          if(y>2010 & !is.na(x) & x>=55 & x<=56) "I.hotel_restuarant" else 
+                                            if(y>2010 & !is.na(x) & x>=58 & x<=63) "J.info_communication" else 
+                                              if(y>2010 & !is.na(x) & x>=64 & x<=66) "K.finanservice" else 
+                                                if(y>2010 & !is.na(x) & x>=69 & x<=75) "M.professionals" else 
+                                                  if(y>2010 & !is.na(x) & x>=64 & x<=66) "K.finanservice" else 
+                                                    if(y>2010 & !is.na(x) & x==84) "O.gov_military" else    
+                                                      if(y>2010 & !is.na(x) & x==85) "P.eduservice" else 
+                                                        if(y>2010 & !is.na(x) & x>=86 & x<=88) "Q.health_socservice" else 
+                                                          if(y>2010 & !is.na(x) & x==97) "T.domesticservice" else
+                                                            if(is.na(x)) NA else "Z.allothers"
+                                                              
+
+# create industry variable 
+data$indus.tab <- mapply(indus.fn, as.numeric(data$indus.2dg), data$year)
+describe(data$indus.2dg); describe(data$indus.tab); table(data$indus.tab) # check new variable 
+
+# deal with unemployment
+# use re.unem = reason for unemployment (1-9). Blank if not relevant 
+data$indus.tab[data$re.unem>0] <- "Z.unem" # replace indus.tab with "unem" if unemployed
+
+#-------------------------
+# Save data
+#-------------------------
+write.table(data, "/Users/Mint/Dropbox/Mint/Dissertation_Data/LFSq1-indus-edu.txt",sep="\t")
 
 
-data$indus_tab <- mapply(indus, data$indus_2dg, data$year)
+# Import 
+data <- csv.get("/Users/Mint/Dropbox/Mint/Dissertation_Data/LFSq1-indus-edu.txt",sep="\t")
 
-#-----Subsetting data------ 
+#-------------------------
+# Pop in each edu level by cohort 
+#-------------------------
 
-# change one by one
-temp <- data[data$edulev == "lessthanhigh",]
-#temp <- data[data$edulev == "high",]
-#temp <- data[data$edulev == "postsec",]
-#temp <- data[data$edulev == "colgrad",]
+# weighted count of obs by education level 
+edufrac.df <- aggregate(data$weight, by=list(year=data$year,edulev=data$edulev,cohort=data$cohort), FUN=sum) 
+
+# sum weights to find total number of pop in each year 
+# (Note: weight sys changes in year 2011)
+N <- aggregate(data$weight, by=list(year=data$year,cohort=data$cohort), FUN=sum)
+
+edufrac.df <- merge(edufrac.df, N, by=c("year","cohort")) # merge pop by edu level and total pop 
+edufrac.df$fraction <- edufrac.df$x.x / edufrac.df$x.y * 100 # fraction of pop in each edu level
+
+edufrac.df <- edufrac.df[ , -which(names(edufrac.df) %in% c("x.x","x.y"))] # remove unneccesary cols
+
+# Create plots 
+#-------------------------
+
+# Assign variables as factors to make it goes in this order in the plots
+edufrac.df$edulev <- factor(edufrac.df$edulev, levels = c("lessthanhigh","high","postsec","colgrad","master","phd"))
+edufrac.df$cohort <- factor(edufrac.df$cohort, levels = c(B,A))
+
+ggplot(edufrac.df[edufrac.df$year==2007,], aes(x = edulev, y = fraction),) +
+  geom_bar(aes(fill = cohort), position = "dodge", stat="identity") + 
+  xlab("\nEducation Level") +
+  ylab("Fraction of population (2007)\n") + 
+  guides(fill=FALSE) + 
+  theme_bw() +
+  coord_flip() +
+  scale_y_reverse() +
+  ylim(85, 0) +
+  guides(fill=guide_legend(title="Cohort"))
+dev.copy(png,'Edu-pop-2007.png')
+dev.off()
+
+ggplot(edufrac.df[edufrac.df$year==2015,], aes(x = edulev, y = fraction),) +
+  geom_bar(aes(fill = cohort), position = "dodge", stat="identity") + 
+  xlab("\nEducation Level") +
+  ylab("Fraction of population (2015)\n") + 
+  guides(fill=FALSE) + 
+  theme_bw() +
+  coord_flip() +
+  ylim(0, 85) +
+  guides(fill=guide_legend(title="Cohort"))
+dev.copy(png,'Edu-pop-2015.png')
+dev.off()
+
+# Create table 
+#-------------------------
+
+# reshape data long to wide 
+library(reshape)
+temp.y <- cast(edufrac.df[edufrac.df$cohort==A,], year~edulev, value='fraction') # reshape long to wide
+temp.y$cohort <- A
+temp.o <- cast(edufrac.df[edufrac.df$cohort==B,], year~edulev, value='fraction') # reshape long to wide
+temp.o$cohort <- B
+
+edufrac.out <- rbind(temp.y,temp.o) # output data frame: pop by cohort, year, edu level
+#rm(temp.y,temp.o,edufrac.df,N) # remove data frames 
+
+# reorder columns
+edufrac.out <- edufrac.out[c("year","cohort","lessthanhigh","high","postsec","colgrad","master","phd")]
+# edufrac.out$sum <- with(edufrac.out, lessthanhigh+high+postsec+colgrad+master+phd) # check if sums up to 100
 
 
-# Find weighted count of obs in each sample frame 
-N <- aggregate(temp$weight, by=list(qtr=temp$qtr,year=temp$year), FUN=sum)
 
-temp1 <- aggregate(temp$weight, by=list(qtr=temp$qtr, year=temp$year, indus=temp$indus_tab), FUN=sum)
-temp1 <- merge(temp1, N, by=c("qtr", "year"))
-temp1$fraction <- temp1$x.x / temp1$x.y * 100
+#-------------------------
+# Industry x education pop
+#-------------------------
 
-temp1 <- temp1[,-c(4:5)] # remove unneccesary cols
+eduindus.df <- aggregate(data$weight, by=list(year=data$year, indus=data$indus.tab, edulev=data$edulev, cohort=data$cohort), FUN=sum)
+eduindus.df <- merge(eduindus.df, N, by=c("year","cohort"))
+eduindus.df$fraction <- eduindus.df$x.x / eduindus.df$x.y * 100
+
+eduindus.df <- eduindus.df[ , -which(names(eduindus.df) %in% c("x.x","x.y"))] # remove unneccesary cols
+
+# Assign variables as factors to make it goes in this order in the plots
+eduindus.df$edulev <- factor(eduindus.df$edulev, levels = c("lessthanhigh","high","postsec","colgrad","master","phd"))
+eduindus.df$cohort <- factor(eduindus.df$cohort, levels = c(B,A))
+
+
+# Create plots 
+#-------------------------
+
+pick.cohort = A 
+#pick.cohort = B
+
+pick.year = 2007
+ggplot(eduindus.df[eduindus.df$year==pick.year & eduindus.df$cohort==pick.cohort,], aes(x=edulev, y=fraction, fill=indus),) +
+    geom_bar(stat="identity") + 
+    xlab("\nEducation Level") +
+    ylab(paste(paste0("Fraction of workers ",pick.cohort),pick.year,sep=" ")) + 
+    guides(fill=FALSE) + 
+    theme_bw() +
+    coord_flip() +
+    scale_y_reverse() +
+    ylim(85, 0) +
+    guides(fill=guide_legend(title="Industry"))
+dev.copy(png, paste0(paste(paste0("Edu-Indus",pick.year),pick.cohort,sep="-"),".png"))
+dev.off() 
+  
+pick.year = 2015
+ggplot(eduindus.df[eduindus.df$year==pick.year & eduindus.df$cohort==pick.cohort,], aes(x=edulev, y=fraction, fill=indus),) +
+    geom_bar(stat="identity") + 
+    xlab("\nEducation Level") +
+    ylab(paste(paste0("Fraction of workers ",pick.cohort),pick.year,sep=" ")) + 
+    guides(fill=FALSE) + 
+    theme_bw() +
+    coord_flip() +
+    ylim(0, 85) +
+    guides(fill=guide_legend(title="Industry"))
+  dev.copy(png, paste0(paste(paste0("Edu-Indus",pick.year),pick.cohort,sep="-"),".png"))
+  dev.off()     
+
+
+  
+
 
 # reshape data long to wide 
 temp2 <- temp1[temp1$qtr==1,] # keep only 1st quarter data
 temp2 <- temp2[,-c(1)] # remove qtr column
 temp2 <- cast(temp2, indus~year, value='fraction') # reshape long to wide
 # reorder rows
-target <- c("agri","fisheries","foodmanuf","garment","electronics","motors","construct","retails","allothers")
-temp2 <- temp2[match(target, temp2$indus),]
+#target <- c("agri","fisheries","foodmanuf","garment","electronics","motors","construct","retails","allothers")
+#temp2 <- temp2[match(target, temp2$indus),]
 
 # Select one by one
 temp2$edulev <- "Less than high school"
@@ -130,56 +265,87 @@ temp2$edulev <- "Less than high school"
 #temp2$edulev <- "College grads"
 
 # Only the first edulev category use first row, the rest use second row
-indus_edulev <- temp2
-#indus_edulev <- rbind(indus_edulev, temp2)
+indus_edu <- temp2
+#indus_edu <- rbind(indus_edu, temp2)
 
 
 # Before this repeat all edu cat first 
-indus_edulev_wide <- indus_edulev[,-c(3:9)]
-colnames(indus_edulev_wide) <- c("Industry","Frac2007","Frac2015","EduLevel")
+indus_edu <- indus_edu[,-c(3:9)] # keep only 2007 and 2015
+colnames(indus_edu) <- c("Industry","Frac2007","Frac2015","EduLevel")
 
 # export table 
-write.table(indus_edulev_wide, "/Users/Mint/Desktop/indus_edulev.txt",sep="\t")
+write.table(indus_edu, "/Users/Mint/Desktop/indus_edu.txt",sep="\t")
 
-#----create stacked bar graphs----
 
-# remove all others rows
-indus_edulev_temp <- subset(indus_edulev_wide, indus_edulev_wide$Industry != "allothers" & indus_edulev_wide$Industry != "retails" ) 
+#----------------------------
+# Plot stacked bar charts
+#----------------------------
+indus_edu_plot <- indus_edu
+#indus_edu_plot <- subset(indus_edu, indus_edu$Industry != "allothers" & indus_edu$Industry != "retails" ) # remove retails and allothers indus cat. Don't want to include in the plots 
 
-# Make EduLevel a factor to make sure it goes in this order in the plots
-indus_edulev_temp$EduLevel <- factor(indus_edulev_temp$EduLevel, levels = c("Less than high school", "High school",  "Post secondary", "College grads"))
+# Make EduLevel a factor to make it goes in this order in the plots
+indus_edu_plot$edulev <- factor(indus_edu_plot$edulev, levels = c("Less than high school", "High school",  "Post secondary", "College grads"))
+indus_edu_plot$Industry <- factor(indus_edu_plot$Industry, levels = c("agri","fisheries","foodmanuf","garment","electronics","motors","construct"))
 
-ggplot(indus_edulev_temp, aes(x=Industry, y=Frac2007, fill=EduLevel),) +
+colnames(indus_edu_plot)
+colnames(indus_edu_plot) <- c("Industry","Frac2007","EduLevel")
+
+
+ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2007, fill=Industry),) +
   geom_bar(stat="identity") + 
-  xlab("\nIndustry") +
+  xlab("\nEducation Level") +
   ylab("Fraction of workers (2007)\n") + 
   guides(fill=FALSE) + 
   theme_bw() +
   coord_flip() +
-  guides(fill=guide_legend(title="Education Level"))
-dev.copy(png,'Indus-Edu-2007.png')
-dev.off()
-
-ggplot(indus_edulev_temp, aes(x=EduLevel, y=Frac2007, fill=Industry),) +
-  geom_bar(stat="identity") + 
-  xlab("\nEducation Level") +
-  ylab("Fraction of workers in each edu level (2007)\n") + 
-  guides(fill=FALSE) + 
-  theme_bw() +
-  coord_flip() +
-  scale_y_reverse() + 
+  scale_y_reverse() +
+  ylim(20, 0) +
   guides(fill=guide_legend(title="Industry"))
 dev.copy(png,'Edu-Indus-2007.png')
 dev.off()
 
-ggplot(indus_edulev_temp, aes(x=EduLevel, y=Frac2015, fill=Industry),) +
+ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2015, fill=Industry),) +
   geom_bar(stat="identity") + 
   xlab("\nEducation Level") +
-  ylab("Fraction of workers in each edu level (2015)\n") + 
+  ylab("Fraction of workers (2015)\n") + 
   guides(fill=FALSE) + 
   theme_bw() +
   coord_flip() + 
+  ylim(0, 20) +
   guides(fill=guide_legend(title="Industry"))
 dev.copy(png,'Edu-Indus-2015.png')
 dev.off()
 
+#----remove less than high school-----
+# make other level of education easy to see fractions of workers in each industry
+
+indus_edu_plot <- subset(indus_edu_plot, indus_edu_plot$EduLevel != "Less than high school") 
+
+ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2007, fill=Industry),) +
+  geom_bar(stat="identity") + 
+  xlab("\nEducation Level") +
+  ylab("Fraction of workers (2007)\n") + 
+  guides(fill=FALSE) + 
+  theme_bw() +
+  coord_flip() +
+  scale_y_reverse() +
+  ylim(5, 0) +
+  guides(fill=guide_legend(title="Industry"))
+dev.copy(png,'Edu-Indus-2007-highabove.png')
+dev.off()
+
+ggplot(indus_edu_plot, aes(x=EduLevel, y=Frac2015, fill=Industry),) +
+  geom_bar(stat="identity") + 
+  xlab("\nEducation Level") +
+  ylab("Fraction of workers (2015)\n") + 
+  guides(fill=FALSE) + 
+  theme_bw() +
+  coord_flip() + 
+  ylim(0, 5) +
+  guides(fill=guide_legend(title="Industry"))
+dev.copy(png,'Edu-Indus-2015-highabove.png')
+dev.off()
+
+#-------------------------
+# Education  
+#-------------------------
